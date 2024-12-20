@@ -13,17 +13,19 @@ const ServicePage = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [audioInitialized, setAudioInitialized] = useState(false);
   const navigate = useNavigate();
-  
-  const service = useServiceStore(state => state.getService(id || ''));
+
+  const service = useServiceStore((state) => state.getService(id || ''));
   const languageCode = AZURE_CONFIG.languageMap[selectedLanguage as keyof typeof AZURE_CONFIG.languageMap];
-  
-  const { 
-    translations, 
-    status, 
-    lastUpdate, 
-    debugMessages, 
-    replayAudio 
+
+  const {
+    translations,
+    status,
+    lastUpdate,
+    debugMessages,
+    replayAudio,
   } = useServiceConnection(id!, languageCode);
+
+
 
   // Initialize audio context
   useEffect(() => {
@@ -99,7 +101,7 @@ const ServicePage = () => {
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Volume2 className="h-5 w-5 text-gray-600" />
@@ -112,14 +114,16 @@ const ServicePage = () => {
                 className="w-24"
               />
             </div>
-            
+
             <select
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
               className="rounded-lg border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500"
             >
-              {service.languages.map(lang => (
-                <option key={lang} value={lang}>{lang}</option>
+              {service.languages.map((lang) => (
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
               ))}
             </select>
           </div>
@@ -204,7 +208,7 @@ const ServicePage = () => {
             <div className="flex-1">
               <h3 className="font-medium text-gray-800">Connection Info</h3>
               <p className="text-gray-600">
-                {lastUpdate 
+                {lastUpdate
                   ? `Last update received at ${lastUpdate.toLocaleTimeString()}`
                   : 'No updates received yet'}
               </p>

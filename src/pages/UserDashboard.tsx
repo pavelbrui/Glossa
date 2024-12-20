@@ -38,7 +38,7 @@ const UserDashboard = () => {
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-start">
                 <h3 className="text-xl font-semibold text-gray-800">{service.title}</h3>
-                {service.isLive && (
+                {service.is_live && (
                   <span className="flex items-center space-x-1 bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-medium">
                     <Radio className="h-4 w-4 animate-pulse" />
                     <span>Live</span>

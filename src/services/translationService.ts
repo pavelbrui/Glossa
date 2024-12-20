@@ -1,6 +1,6 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 import { AZURE_CONFIG } from '../config/azure';
-import { mockWebSocketService } from './mockWebSocket';
+import { webSocketService } from './WebSocketService';
 
 interface TranslationResult {
   type: 'translation';
@@ -9,7 +9,6 @@ interface TranslationResult {
   timestamp: string;
   final?: boolean;
 }
-
 class TranslationService {
   private speechConfig: sdk.SpeechTranslationConfig | null = null;
   private recognizer: sdk.TranslationRecognizer | null = null;
@@ -23,7 +22,7 @@ class TranslationService {
 
   constructor() {
     try {
-      console.log('[Translation] Initializing Speech SDK...');
+      this.log('🔄 Initializing Speech SDK...');
 
       if (!AZURE_CONFIG.key || !AZURE_CONFIG.region) {
         throw new Error('Invalid Azure configuration: missing key or region');
@@ -41,7 +40,7 @@ class TranslationService {
       this.speechConfig.speechRecognitionLanguage = AZURE_CONFIG.speechRecognitionLanguage;
       
       AZURE_CONFIG.targetLanguages.forEach(lang => {
-        console.log(`[Translation] Adding target language: ${lang}`);
+        this.log(`🌐 Adding target language: ${lang}`);
         this.speechConfig?.addTargetLanguage(lang);
       });
 
@@ -67,12 +66,12 @@ class TranslationService {
 
   private log(...args: any[]) {
     if (this.debug) {
-      console.log('[Translation]', ...args);
+      console.log('[TranslationService]', ...args);
     }
   }
 
   private error(...args: any[]) {
-    console.error('[TranslationService]', ...args);
+    console.error('[TranslationService]   Error', ...args);
   }
 
   private shouldProcessSentence(text: string): boolean {
@@ -84,7 +83,7 @@ class TranslationService {
     const isLongEnough = text.split(' ').length >= AZURE_CONFIG.recognitionConfig.minWordCount;
     const isNewContent = text !== this.currentSentence;
 
-    console.log('[Translation] Processing sentence:', {
+    this.log('Processing sentence check:', {
       text,
       timeSinceLastProcess,
       hasEndMarker,
@@ -101,7 +100,7 @@ class TranslationService {
       AZURE_CONFIG.recognitionConfig.commonPhrases.forEach(phrase => {
         phraseList.addPhrase(phrase);
       });
-      console.log('[Translation] Phrase list configured');
+      this.log('✅ Phrase list configured successfully');
     } catch (error) {
       this.error('⚠️ Failed to setup phrase list:', error);
     }
@@ -110,17 +109,6 @@ class TranslationService {
   startTranslation(serviceId: string, audioStream: MediaStream, onTranslation: (result: any) => void) {
     try {
       
-
-      // Subscribe the service before starting translation
-      mockWebSocketService.subscribe(
-          serviceId,
-          AZURE_CONFIG.speechRecognitionLanguage,
-          serviceId, // Using serviceId as sessionId for simplicity
-          (data) => {
-      
-              onTranslation(data);
-          }
-      );
 
       // Existing logic for starting translation...
   } catch (error) {
@@ -152,8 +140,8 @@ class TranslationService {
       if (!audioConfig) {
         throw new Error('Failed to create audio config');
       }
-      
-      console.log('[Translation] Audio config created');
+
+      this.log('🔊 Audio config created successfully');
 
       this.audioContext = new AudioContext({
         sampleRate: AZURE_CONFIG.recognitionConfig.sampleRate
@@ -197,10 +185,9 @@ class TranslationService {
 
         this.log('Speech detected:', e.result.text);
         
-        // Log the raw translations map
-        const translationsMap = e.result.translations;
-        this.log('Raw translations map:', translationsMap);
-
+         // Log the raw translations map
+         const translationsMap = e.result.translations;
+         this.log('Raw translations map:', translationsMap)        
         if (this.shouldProcessSentence(e.result.text)) {
           const translations: Record<string, string> = {};
           
@@ -231,17 +218,15 @@ class TranslationService {
 
           this.currentSentence = e.result.text;
           this.lastProcessedTime = Date.now();
-
-          this.log('Broadcasting translation:', result);
-          mockWebSocketService.broadcast(serviceId, result);
+          
+          this.log('📢 Broadcasting interim translation:', result);
+          webSocketService.broadcast(serviceId, result);
           onTranslation(result);
         }
       };
 
       this.recognizer.recognized = (s, e) => {
         if (e.result.reason === sdk.ResultReason.TranslatedSpeech) {
-          this.log('Recognized speech:', e.result);
-          
           const translations: Record<string, string> = {};
           const translationsMap = e.result.translations;
           
@@ -274,38 +259,20 @@ class TranslationService {
           this.lastProcessedTime = Date.now();
 
           this.log('📢 Broadcasting final translation:', result);
-          mockWebSocketService.broadcast(serviceId, result);
+          webSocketService.broadcast(serviceId, result);
           onTranslation(result);
         } else if (e.result.reason === sdk.ResultReason.NoMatch) {
-          console.log('[Translation] No match:', e.result.noMatchReason);
+          this.log('⚠️ No speech detected:', sdk.NoMatchReason[e.result.noMatchReason]);
+          //onTranslation({ error: 'No speech detected' });
         }
       };
 
       this.recognizer.canceled = (s, e) => {
-        console.log('[Translation] Canceled:', {
-          reason: e.reason,
-          errorDetails: e.errorDetails
-        });
-        
-        // Only send error if it's not a normal cancellation
-        if (e.reason !== sdk.CancellationReason.EndOfStream) {
-          const errorMessage = `Recognition canceled: ${sdk.CancellationReason[e.reason]}, Details: ${e.errorDetails}`;
-          onTranslation({ 
-            type: 'error',
-            error: errorMessage,
-            timestamp: new Date().toISOString()
-          });
-        }
-        
-        // Try to reconnect if error was due to network
-        if (e.reason === sdk.CancellationReason.Error && 
-            e.errorDetails.includes('network')) {
-          setTimeout(() => {
-            this.startTranslation(serviceId, audioStream, onTranslation);
-          }, 2000);
-        }
+        const errorMessage = `Recognition canceled: ${sdk.CancellationReason[e.reason]}, Details: ${e.errorDetails}`;
+        this.error('❌ Recognition canceled:', errorMessage);
+        onTranslation({ error: errorMessage });
       };
-      
+
       this.recognizer.sessionStarted = (s, e) => {
         this.log('🟢 Session started:', e.sessionId);
         onTranslation({ 

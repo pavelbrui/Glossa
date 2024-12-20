@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Users, Clock, Edit, Trash2 } from 'lucide-react';
 import useServiceStore from '../store/useServiceStore';
@@ -18,7 +18,7 @@ const AdminDashboard = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this service?')) {
       deleteService(id);
     }
@@ -109,7 +109,7 @@ const AdminDashboard = () => {
             setIsEditModalOpen(false);
             setSelectedService(null);
           }}
-          service={selectedService} 
+          service={selectedService}
         />
       )}
     </div>

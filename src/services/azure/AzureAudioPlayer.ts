@@ -24,46 +24,51 @@ class AzureAudioPlayer {
 
   async playAudioData(audioData: ArrayBuffer, options: PlaybackOptions = {}): Promise<void> {
     try {
-      this.log('Starting audio playback', { dataSize: audioData.byteLength });
-      
-      await audioContextManager.initialize();
-      const context = audioContextManager.getContext();
-      
-      // Stop any currently playing audio
-      if (this.currentSource) {
-        this.log('Stopping current playback');
-        this.currentSource.stop();
-        this.currentSource.disconnect();
+      if (!(audioData instanceof ArrayBuffer) || audioData.byteLength === 0) {
+        throw new Error('Invalid or empty audio data provided.');
       }
 
-      // Resume context if suspended
+      this.log('Initializing audio playback', { dataSize: audioData.byteLength });
+
+      // Initialize or resume audio context
+      await audioContextManager.initialize();
+      const context = audioContextManager.getContext();
+
       if (context.state === 'suspended') {
         this.log('Resuming audio context');
         await context.resume();
       }
 
+      // Stop any currently playing audio
+      if (this.currentSource) {
+        this.log('Stopping current playback');
+        this.stop();
+      }
+
+      // Decode audio data
       this.log('Decoding audio data');
-      const audioBuffer = await context.decodeAudioData(audioData.slice(0));
-      
+      const clonedBuffer = audioData.slice(0); // Clone ArrayBuffer to avoid detachment issues
+      const audioBuffer = await context.decodeAudioData(clonedBuffer);
+
+      // Create audio source
       this.log('Creating audio source');
       const source = context.createBufferSource();
       source.buffer = audioBuffer;
-      
+
       // Create gain node for volume control
       this.gainNode = context.createGain();
       this.gainNode.gain.value = options.volume ?? 1.0;
-      
+
       // Connect nodes
       source.connect(this.gainNode);
       this.gainNode.connect(context.destination);
-      
+
       this.currentSource = source;
 
-      // Set up event handlers
+      // Playback event handlers
       source.onended = () => {
         this.log('Playback ended');
-        this.currentSource = null;
-        this.gainNode = null;
+        this.cleanupAudioNodes();
         options.onEnd?.();
       };
 
@@ -71,17 +76,16 @@ class AzureAudioPlayer {
       this.log('Starting playback');
       source.start(0);
       options.onStart?.();
-
     } catch (error) {
       this.error('Playback error:', error);
       options.onError?.(error instanceof Error ? error : new Error('Unknown playback error'));
-      throw error;
     }
   }
 
   setVolume(volume: number): void {
     if (this.gainNode) {
       this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
+      this.log('Volume set to', this.gainNode.gain.value);
     }
   }
 
@@ -89,6 +93,12 @@ class AzureAudioPlayer {
     if (this.currentSource) {
       this.log('Stopping playback');
       this.currentSource.stop();
+      this.cleanupAudioNodes();
+    }
+  }
+
+  private cleanupAudioNodes(): void {
+    if (this.currentSource) {
       this.currentSource.disconnect();
       this.currentSource = null;
     }
@@ -101,6 +111,7 @@ class AzureAudioPlayer {
   async cleanup(): Promise<void> {
     this.stop();
     await audioContextManager.close();
+    this.log('Audio context cleaned up');
   }
 }
 

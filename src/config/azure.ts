@@ -15,7 +15,8 @@ export const AZURE_CONFIG = {
     'es': 'es-ES-ElviraNeural',
     'fr': 'fr-FR-DeniseNeural',
     'ko': 'ko-KR-SunHiNeural',
-    'ru': 'ru-RU-SvetlanaNeural'
+    'ru': 'ru-RU-SvetlanaNeural',
+    'en': 'en-US-JennyNeural'
   },
   recognitionConfig: {
     initialSilenceTimeoutMs: 5000,

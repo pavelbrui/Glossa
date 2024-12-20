@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { mockWebSocketService } from '../services/mockWebSocket';
+import { webSocketService } from '../services/WebSocketService';
 
 interface Translation {
   original: string;
@@ -98,7 +98,7 @@ export const useTranslationSocket = (serviceId: string, language: string) => {
     const healthCheck = setInterval(() => {
       const timeSinceLastHeartbeat = Date.now() - lastHeartbeat.current;
       if (timeSinceLastHeartbeat > 10000) {
-        setStatus('error');
+        //setStatus('error');
         addDebugMessage('Connection lost - no heartbeat received');
       }
     }, 5000);
@@ -108,10 +108,10 @@ export const useTranslationSocket = (serviceId: string, language: string) => {
 
   useEffect(() => {
     addDebugMessage(`Connecting to service ${serviceId} for ${language}`);
-    setStatus('connecting');
+    //setStatus('connecting');
 
     try {
-      const unsubscribe = mockWebSocketService.subscribe(
+      const unsubscribe = webSocketService.subscribe(
         serviceId,
         language,
         sessionId.current,

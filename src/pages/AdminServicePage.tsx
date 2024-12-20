@@ -68,7 +68,6 @@ const AdminServicePage = () => {
 
   const toggleStreaming = async () => {
     if (!id) return;
-   
 
     try {
       if (!isStreaming) {
@@ -105,6 +104,8 @@ const AdminServicePage = () => {
         translationService.startTranslation(id, audioStream, (result) => {
           if (result.error) {
             addDebugMessage(`Translation error: ${result.error}`, true);
+            console.log('Error!!---', result.error);
+            
             setConnectionStatus('error');
             return;
           }

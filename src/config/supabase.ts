@@ -88,6 +88,7 @@ export type Service = {
   date: string;
   time: string;
   is_live: boolean;
+  attendees?:number
   created_by: string;
   created_at: string;
   languages: string[];

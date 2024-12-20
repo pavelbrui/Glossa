@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { mockWebSocketService } from '../services/mockWebSocket';
+import { webSocketService } from '../services/WebSocketService';
 import { azureAudioPlayer } from '../services/azure/AzureAudioPlayer';
 import { audioContextManager } from '../services/audio/AudioContextManager';
 
@@ -9,6 +9,18 @@ interface Translation {
   timestamp: Date;
   audioData?: ArrayBuffer;
 }
+
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return bytes.buffer;
+};
 
 export function useServiceConnection(serviceId: string, language: string) {
   const [translations, setTranslations] = useState<Translation[]>([]);
@@ -46,14 +58,16 @@ export function useServiceConnection(serviceId: string, language: string) {
     }
 
     if (data.type === 'translation') {
+      console.log('data.type === translation',  data.translation);
       try {
-        const newTranslation = {
+        const audioBuffer = base64ToArrayBuffer(data.audioData);
+        const newTranslation: Translation = {
           original: data.original,
           translation: data.translation,
           timestamp: new Date(data.timestamp),
-          audioData: data.audioData
+          audioData: audioBuffer,
         };
-        
+
         setTranslations(prev => {
           const isDuplicate = prev.some(t => 
             t.original === newTranslation.original && 
@@ -63,15 +77,15 @@ export function useServiceConnection(serviceId: string, language: string) {
           
           if (!isDuplicate) {
             addDebugMessage(`New translation: ${newTranslation.translation}`);
-            if (newTranslation.audioData) {
+        if (newTranslation.audioData) {
               azureAudioPlayer.playAudioData(newTranslation.audioData, {
                 onStart: () => addDebugMessage('Playing audio translation'),
                 onEnd: () => addDebugMessage('Audio playback completed'),
                 onError: (error) => addDebugMessage(`Audio playback error: ${error.message}`)
               }).catch(error => {
                 addDebugMessage(`Failed to play audio: ${error.message}`);
-              });
-            }
+          });
+        }
             return [...prev, newTranslation].slice(-10);
           }
           return prev;
@@ -83,11 +97,19 @@ export function useServiceConnection(serviceId: string, language: string) {
       }
     }
   }, [addDebugMessage]);
+  useEffect(() => {
+    const initAudioIfNeeded = async () => {
+      if (!audioContextManager.isInitialized()) {
+        await audioContextManager.initialize();
+      }
+    };
+    initAudioIfNeeded();
+  }, []);
 
   useEffect(() => {
     isActive.current = true;
     addDebugMessage(`Connecting to service ${serviceId} for ${language}`);
-    setStatus('connecting');
+    //setStatus('connecting');
 
     try {
       // Initialize audio context early
@@ -99,14 +121,14 @@ export function useServiceConnection(serviceId: string, language: string) {
         cleanupRef.current();
         cleanupRef.current = null;
       }
-
-      const cleanup = mockWebSocketService.subscribe(
+      
+      const cleanup = webSocketService.subscribe(
         serviceId,
         language,
         sessionId.current,
         handleMessage
       );
-
+      
       cleanupRef.current = cleanup;
       addDebugMessage('Connected successfully');
 
@@ -134,8 +156,8 @@ export function useServiceConnection(serviceId: string, language: string) {
     const healthCheck = setInterval(() => {
       if (!isActive.current) return;
       const timeSinceLastHeartbeat = Date.now() - lastHeartbeat.current;
-      if (timeSinceLastHeartbeat > 10000) {
-        setStatus('error');
+      if (timeSinceLastHeartbeat > 100000) {
+        //setStatus('error');
         addDebugMessage('Connection lost - no heartbeat received');
       }
     }, 5000);
@@ -144,6 +166,10 @@ export function useServiceConnection(serviceId: string, language: string) {
   }, [addDebugMessage]);
 
   const replayAudio = useCallback(async (translation: Translation) => {
+    console.log('if (!translation.audioData) return;');
+    console.log(translation);
+    
+    
     if (!translation.audioData) return;
     
     try {

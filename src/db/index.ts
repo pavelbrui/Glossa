@@ -9,12 +9,12 @@ export interface User {
 }
 
 export interface Service {
-  id?: number;
+  id?: String;
   title: string;
   date: string;
   time: string;
   is_live: boolean;
-  created_by: number;
+  created_by: string;
   created_at: string;
   languages: string[];
   attendees: number;
@@ -66,7 +66,7 @@ export const getServices = async (): Promise<Service[]> => {
 
   return services.map(service => ({
     ...service,
-    attendees: attendees.filter(a => a.service_id === service.id).length
+    attendees: attendees.filter(a => a.service_id.toString() === service.id).length
   }));
 };
 
