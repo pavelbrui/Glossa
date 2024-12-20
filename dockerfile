@@ -16,6 +16,14 @@ COPY . .
 # Build the React app
 RUN npm run build
 
+# Use a lightweight web server to serve the app
+FROM nginx:alpine
+
+# Copy the build folder from the previous stage to Nginx's html folder
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Expose the port that Nginx will run on
+EXPOSE 80
 
 # Start Nginx when the container launches
-CMD ["npm", "run", "start"]
+CMD ["nginx", "-g", "daemon off;"]
