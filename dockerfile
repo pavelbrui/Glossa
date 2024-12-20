@@ -1,29 +1,32 @@
-# Use the official Node.js image as a base
-FROM node:18 AS build
+# Use a lightweight Node.js image as the base image
+FROM node:18-alpine AS builder
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
+# Copy package.json and package-lock.json to the container
+COPY package.json tsconfig.json vite.config.ts /app/
+
+# Copy application files
+COPY . /app/
 
 # Install dependencies
 RUN npm install
 
-# Copy the rest of your application code
-COPY . .
-
-# Build the React app
+# Build the frontend and backend
 RUN npm run build
 
-# Use a lightweight web server to serve the app
-FROM nginx:alpine
+# Use a lightweight web server image for serving the built frontend
+FROM nginx:stable-alpine AS production
 
-# Copy the build folder from the previous stage to Nginx's html folder
-COPY --from=build /app/build /usr/share/nginx/html
+# Copy the built application from the previous stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose the port that Nginx will run on
+# Copy Nginx configuration for handling WebSocket and serving static files
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Expose the port Nginx will serve on
 EXPOSE 80
 
-# Start Nginx when the container launches
+# Start Nginx server
 CMD ["nginx", "-g", "daemon off;"]
