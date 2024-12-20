@@ -7,9 +7,15 @@ export class WebSocketClient extends EventEmitter {
   private subscriptions = new Map<string, WebSocketCallback>();
   private heartbeatIntervals = new Map<string, NodeJS.Timeout>();
   private debug: boolean = true;
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts: number = 5;
+  private readonly reconnectInterval: number = 2000;
 
   constructor(url: string) {
     super();
+    if (!url) {
+      throw new Error('WebSocket URL is required');
+    }
     this.connection = new WebSocketConnection(url);
     this.connect();
   }
@@ -41,17 +47,10 @@ export class WebSocketClient extends EventEmitter {
 
       ws.onclose = async () => {
         this.log('Connection closed, attempting to reconnect...');
-        this.emit('disconnected', 'ZZZZZ');
-        try {
-          await this.reconnect();
-          this.log('Successfully reconnected');
-          this.emit('reconnected', 'XXXXXX');
-          await this.resubscribeAll();
-        } catch (error) {
-          this.log('Reconnection failed:', error);
-          this.emit('error', error);
-        }
+        this.emit('disconnected', 'Connection lost');
+        await this.reconnect();
       };
+
     } catch (error) {
       this.log('Connection failed:', error);
       this.emit('error', error);
@@ -59,20 +58,18 @@ export class WebSocketClient extends EventEmitter {
   }
 
   private async reconnect(): Promise<void> {
-    await this.connection.reconnect();
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.log('Max reconnect attempts reached, giving up');
+      this.emit('error', new Error('Unable to reconnect to WebSocket server'));
+      return;
+    }
+    this.reconnectAttempts++;
+    this.log(`Reconnection attempt ${this.reconnectAttempts}`);
+    await new Promise((resolve) => setTimeout(resolve, this.reconnectInterval));
+    await this.connect();
   }
 
-  private async resubscribeAll(): Promise<void> {
-    for (const [key, callback] of this.subscriptions.entries()) {
-      const [serviceId, language, sessionId] = key.split(':');
-      try {
-        this.subscribe(serviceId, language, sessionId, callback);
-        this.log(`Resubscribed: ${key}`);
-      } catch (error) {
-        console.error(`Failed to resubscribe ${key}:`, error);
-      }
-    }
-  }
+ 
 
   private handleMessage(message: WebSocketMessage): void {
     const key = this.getSubscriptionKey(
@@ -88,8 +85,6 @@ export class WebSocketClient extends EventEmitter {
 
     const callback = this.subscriptions.get(key);
     if (callback) {
-      console.log("if callback");
-      
       this.log(`Executing callback for ${key}`);
       callback(message);
     } else {

@@ -42,12 +42,15 @@ export function useServiceConnection(serviceId: string, language: string) {
     if (!isActive.current) return;
 
     if (data.type === 'heartbeat') {
+      setStatus('connected')
       lastHeartbeat.current = Date.now();
       return;
     }
 
     if (data.type === 'status') {
       setStatus(data.status);
+      console.log("status", data.status);
+      
       addDebugMessage(data.message);
       return;
     }
