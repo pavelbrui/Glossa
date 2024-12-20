@@ -5,13 +5,13 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy package.json and package-lock.json to the container
-COPY package.json tsconfig.json vite.config.ts /app/
-
-# Copy application files
-COPY . /app/
+COPY package.json package-lock.json tsconfig.json vite.config.ts /app/
 
 # Install dependencies
 RUN npm install
+
+# Copy application files
+COPY . /app/
 
 # Build the frontend and backend
 RUN npm run build
