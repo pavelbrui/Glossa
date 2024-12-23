@@ -6,10 +6,12 @@ export class WebSocketClient extends EventEmitter {
   private connection: WebSocketConnection;
   private subscriptions = new Map<string, WebSocketCallback>();
   private heartbeatIntervals = new Map<string, NodeJS.Timeout>();
-  private debug: boolean = true;
   private reconnectAttempts: number = 0;
   private readonly maxReconnectAttempts: number = 5;
   private readonly reconnectInterval: number = 2000;
+  private intentionalClose: boolean = false;
+  private reconnectInProgress: boolean = false;
+  private debug: boolean = true;
 
   constructor(url: string) {
     super();
@@ -26,8 +28,8 @@ export class WebSocketClient extends EventEmitter {
     }
   }
 
-  private getSubscriptionKey(serviceId: string, language: string, sessionId?: string): string {
-    return sessionId ? `${serviceId}:${language}:${sessionId}` : `${serviceId}:${language}`;
+  private getSubscriptionKey(serviceId: string, language: string, sessionId: string): string {
+    return `${serviceId}:${language}:${sessionId}`;
   }
 
   private async connect(): Promise<void> {
@@ -46,36 +48,63 @@ export class WebSocketClient extends EventEmitter {
       };
 
       ws.onclose = async () => {
+        if (this.intentionalClose) {
+          this.log('WebSocket closed intentionally, no reconnection will be attempted.');
+          return;
+        }
         this.log('Connection closed, attempting to reconnect...');
         this.emit('disconnected', 'Connection lost');
         await this.reconnect();
       };
 
+      this.reconnectAttempts = 0; // Reset attempts on successful connection
+      this.reconnectInProgress = false;
+      this.emit('connected', 'Connection established');
     } catch (error) {
       this.log('Connection failed:', error);
       this.emit('error', error);
+      await this.reconnect();
     }
   }
 
   private async reconnect(): Promise<void> {
+    if (this.reconnectInProgress) {
+      return;
+    }
+    this.reconnectInProgress = true;
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       this.log('Max reconnect attempts reached, giving up');
       this.emit('error', new Error('Unable to reconnect to WebSocket server'));
       return;
     }
+
     this.reconnectAttempts++;
     this.log(`Reconnection attempt ${this.reconnectAttempts}`);
     await new Promise((resolve) => setTimeout(resolve, this.reconnectInterval));
     await this.connect();
+
+    // Resubscribe all active subscriptions
+    await this.resubscribeAll();
   }
 
- 
+  private async resubscribeAll(): Promise<void> {
+    for (const [key, callback] of this.subscriptions.entries()) {
+      const [serviceId, language, sessionId] = key.split(':');
+      try {
+        this.subscribe(serviceId, language, sessionId, callback);
+        this.log(`Resubscribed: ${key}`);
+      } catch (error) {
+        console.error(`Failed to resubscribe ${key}:`, error);
+      }
+    }
+  }
 
   private handleMessage(message: WebSocketMessage): void {
     const key = this.getSubscriptionKey(
       message.serviceId || '',
       message.language || '',
-      "1"
+      message.sessionId || '1'
     );
 
     if (message.type === 'heartbeat' || message.type === 'status') {
@@ -98,7 +127,7 @@ export class WebSocketClient extends EventEmitter {
     sessionId: string,
     callback: WebSocketCallback
   ): () => void {
-    const key = this.getSubscriptionKey(serviceId, language, "1");
+    const key = this.getSubscriptionKey(serviceId, language, sessionId);
     this.subscriptions.set(key, callback);
 
     this.connection.send({
@@ -128,7 +157,7 @@ export class WebSocketClient extends EventEmitter {
   }
 
   private unsubscribe(serviceId: string, language: string, sessionId: string): void {
-    const key = this.getSubscriptionKey(serviceId, language, "1");
+    const key = this.getSubscriptionKey(serviceId, language, sessionId);
 
     clearInterval(this.heartbeatIntervals.get(key));
     this.heartbeatIntervals.delete(key);
@@ -138,7 +167,7 @@ export class WebSocketClient extends EventEmitter {
       type: 'unsubscribe',
       serviceId,
       language,
-      sessionId
+      sessionId,
     });
   }
 

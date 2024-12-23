@@ -28,7 +28,7 @@ export function useServiceConnection(serviceId: string, language: string) {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [debugMessages, setDebugMessages] = useState<string[]>([]);
   const lastHeartbeat = useRef<number>(Date.now());
-  const sessionId = useRef<string>(crypto.randomUUID());
+  const sessionId = useRef<string>('1')//crypto.randomUUID());
   const cleanupRef = useRef<(() => void) | null>(null);
   const isActive = useRef(true);
 

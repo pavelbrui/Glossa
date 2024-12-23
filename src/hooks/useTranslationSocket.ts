@@ -16,7 +16,7 @@ export const useTranslationSocket = (serviceId: string, language: string) => {
   const audioContext = useRef<AudioContext | null>(null);
   const currentAudio = useRef<AudioBufferSourceNode | null>(null);
   const lastHeartbeat = useRef<number>(Date.now());
-  const sessionId = useRef<string>(crypto.randomUUID());
+  const sessionId = useRef<string>('1')//crypto.randomUUID());
 
   const addDebugMessage = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();

@@ -133,6 +133,8 @@ const useServiceStore = create<ServiceState>()(
       },
 
       setServiceLiveStatus: async (id, isLive) => {
+        console.log("setServiceLiveStatus: true");
+        
         const stringId = String(id);
         set({ loading: true, error: null });
         try {

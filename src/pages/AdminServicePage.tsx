@@ -99,34 +99,32 @@ const AdminServicePage = () => {
   useEffect(() => {
     if (audioStream && isStreaming && id) {
       try {
-        addDebugMessage('Initializing translation service...');
+      addDebugMessage('Initializing translation service...');
 
-        translationService.startTranslation(id, audioStream, (result) => {
-          if (result.error) {
-            addDebugMessage(`Translation error: ${result.error}`, true);
+      translationService.startTranslation(id, audioStream, (result) => {
+        setConnectionStatus('connected')
+        if (result.error) {
+          addDebugMessage(`Translation error: ${result.error}`, true);
             console.log('Error!!---', result.error);
             
-            setConnectionStatus('error');
-            return;
-          }
+          setConnectionStatus('error');
+          return;
+        }
 
-          if (result.status) {
-            addDebugMessage(`Status: ${result.status}`);
-            if (result.status === 'Recognition started') {
-              setConnectionStatus('connected');
-            }
-            return;
-          }
+        if (result.status === 'Recognition started') {
+          setConnectionStatus('connected');
+        }
 
-          if (result.original) {
-            const timestamp = new Date().toLocaleTimeString();
-            setTranslations(prev => [...prev, {
+        if (result.original) {
+          setTranslations((prev) => [
+            ...prev,
+            {
               original: result.original,
               translations: result.translations || {},
-              timestamp
-            }].slice(-10));
-
-            addDebugMessage(`Received text: ${result.original}`);
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ].slice(-10));
+          addDebugMessage(`Received text: ${result.original}`);
             
             if (result.translations) {
               Object.entries(result.translations).forEach(([lang, text]) => {
@@ -153,16 +151,16 @@ const AdminServicePage = () => {
 
         const interval = setInterval(updateLevel, 100);
 
-        return () => {
+      return () => {
           clearInterval(interval);
           audioContext.close();
           if (isStreaming) {
             translationService.stopTranslation();
             setServiceLiveStatus(id, false);
-            setConnectionStatus(null);
+        setConnectionStatus(null);
             addDebugMessage('Cleanup: stopped translation service');
           }
-        };
+      };
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error';
         setError('Failed to start translation: ' + errorMsg);

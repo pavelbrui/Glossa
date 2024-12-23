@@ -220,8 +220,6 @@ class TranslationService {
           this.lastProcessedTime = Date.now();
           
           this.log('📢 Broadcasting interim translation:', result);
-          webSocketService.broadcast(serviceId, result);
-          onTranslation(result);
         }
       };
 
@@ -277,7 +275,7 @@ class TranslationService {
         this.log('🟢 Session started:', e.sessionId);
         onTranslation({ 
           type: 'status',
-          status: 'Session started',
+          status: 'connected',
           timestamp: new Date().toISOString()
         });
       };
@@ -286,7 +284,7 @@ class TranslationService {
         this.log('🔴 Session stopped:', e.sessionId);
         onTranslation({ 
           type: 'status',
-          status: 'Session stopped',
+          status: 'disconnected',
           timestamp: new Date().toISOString()
         });
       };
@@ -296,6 +294,7 @@ class TranslationService {
         () => {
           this.connectionState = 'connected';
           this.log('✅ Recognition started successfully');
+          
           onTranslation({ 
             type: 'status',
             status: 'connected',
